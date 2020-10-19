@@ -1,0 +1,220 @@
+---
+title: "Berries"
+author: "Simu Huang"
+date: "10/18/2020"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+library(knitr)
+library(tidyverse)
+library(magrittr)
+library(kableExtra)
+
+opts_chunk$set(echo = TRUE, 
+               warning = FALSE,
+               message = FALSE)
+```
+
+
+##  Acquire the data
+
+
+```{r}
+
+## read the data
+
+ber <- read.csv("D:\\Documents\\R Project\\615\\Berry\\berries.csv")
+
+## look at number of unique values in each column 
+a_1 <- ber %>% summarize_all(n_distinct)
+
+## delete some column with constant values
+ber %<>% select( - c(Program, Week.Ending, Geo.Level, Ag.District, Ag.District.Code, County, County.ANSI, Zip.Code, Region, watershed_code, Watershed, CV.... ))
+
+```
+
+## choose the strawberry as our study object and then clean the data  
+
+```{r}
+
+## straberries
+
+b_3 <- ber %>% filter(Commodity=="STRAWBERRIES")
+
+## reorder the data by state
+b_3 <- b_3[order(b_3$State.ANSI),]
+
+## delete some values that cannot be classified
+b_3 %<>% filter(Domain.Category != "NOT SPECIFIED")
+b_3 %<>% filter(Period == "YEAR")
+
+
+## revise some columns and remove some duplicate information which can make the data more intuitive and make it easier for us to use the values in the following steps
+b_3 %<>% separate(Data.Item, c("d1","d2"), sep="-")
+
+unique(b_3$d1)
+unique(b_3$d2)
+b_3 %<>% select(-d1)
+
+b_3 %<>% separate(d2, c("b1","b2"), sep=",")
+unique(b_3$b1)
+unique(b_3$b2)
+
+b_3[is.na(b_3)] <- " "
+for(i in 1:length(b_3$Year)){
+      b_3$`Domain.Category`[i]<-str_replace(b_3$`Domain.Category`[i],"NOT SPECIFIED","NOT SPECIFIED, ")
+}
+b_3 %<>%  separate(Domain.Category, c("D1", "Domain2"), sep = ":")
+b_3 %<>% select(-D1)
+
+b_3 %<>% separate(Domain, c("Domain1_1","Domain1"), sep=",")
+unique(b_3$Domain1_1)
+unique(b_3$Domain1)
+b_3 %<>% select(-Domain1_1)
+
+
+
+## remove the NA
+b_3 %<>% na.omit(b_3)
+b_3$Value <-  as.numeric(as.numeric(b_3$Value))
+
+## check 
+summary(b_3)
+
+
+## take the values and put them in separate columns
+aa <- str_extract(b_3$Domain2, "[0-9].*$")
+aa <- as.numeric(str_replace_all(aa, "[[:punct:]]", " "))
+
+bb <- str_split(b_3$Domain2, "[0-9].*$")
+bb <- unlist(bb)
+bb <- str_trim(bb)
+bb <- bb[-which(bb=="")]
+bb <-str_replace_all(bb, "[[:punct:]]", " ")
+
+## add the new column
+straw1 <- b_3 %>% mutate(Domain = bb, Domain_value = aa)
+straw1 %<>% select(-Domain2)
+straw2  <-  na.omit(straw1)
+
+head(straw2)
+write.csv(straw2, "D:\\Documents\\R Project\\615\\Berry\\straw_cleaned.csv")
+```
+
+
+## exclude the outliers
+
+
+```{r}
+
+## summarize the value by group
+
+s2 <- straw2 %>% group_by(State) %>% summarize(total=sum(Value)) 
+s3 <- straw2 %>% group_by(Year, State) %>% summarize(total=sum(Value)) 
+
+
+print(s2)
+print(s3)
+```
+
+
+## display the structure of s1 and check the maximum and minimum 
+
+
+```{r}
+
+## boxplot
+str(s3)
+summary(s3)
+boxplot(s3$total)
+
+## check for outliers
+boxplot.stats(s3$total)$out
+
+## find the location of the outlier
+x_out <- which(s3$total %in% boxplot.stats(s3$total)$out) 
+print(x_out)
+
+## barplot of the total of each state
+barplot(s2$total, names.arg = s2$State)
+
+## line plot of total amount per year in each country
+ggplot(data= s3,aes(x=Year,y=total,group=State,color=State))+ 
+  geom_line()+ 
+  geom_point()+ 
+  labs(y="Total value")
+```
+
+
+## summary data according to different categories
+
+
+```{r}
+
+# unique(straw2$State)
+# cal <- straw2 %>% filter(State == "CALIFORNIA")
+# flo <- straw2 %>% filter(State == "FLORIDA")
+# was <- straw2 %>% filter(State == "WASHINGTON")
+
+## value for each country for each year
+p_1 <- straw2 %>% group_by(Year,State) %>% 
+  summarise(count =n(),                        #number
+                   max_mon = max(Value),       #maximum
+                   min_mon = min(Value),       #minimum
+                   avg_sales = mean(Value))    #average
+p_1                 
+
+## every country over the years
+p_2 <- straw2 %>% group_by(State) %>% 
+  summarise(count =n(),                        #number
+                   max_mon = max(Value),       #maximum
+                   min_mon = min(Value),       #minimum
+                   avg_sales = mean(Value),    #average
+                   sum_sales = sum(Value))     #sum
+p_2
+
+## the overall situation for each year
+p_3 <- straw2 %>% group_by(Year) %>% 
+  summarise(       count =n(),                 #number
+                   max_mon = max(Value),       #maximum
+                   min_mon = min(Value),       #minimum
+                   avg_sales = mean(Value),    #average
+                   sum_sales = sum(Value))     #sum
+p_3
+
+p_4 <- straw2 %>% group_by(Domain) %>% summarise(count =n())  
+p_4
+```
+
+
+```{r}
+
+## the variance
+stra_var <- straw2 %>% group_by(State) %>% summarise(var = var(Value))
+print(stra_var)
+
+```
+
+
+
+```{r}
+
+## correlation
+straw3 <- data.frame(straw2$Value, straw2$Domain_value)
+cor<- cor(straw3)
+print(cor)
+cor.test(straw2$Domain_value, straw2$Value, method = "pearson")
+
+```
+
+
+    From the result, we can find that people prefer using ABAMECTIN，ACETAMIPRID，and AZOXYSTROBIN. And less people choose to use ACEQUINOCYL. In recent years the value of strawberries in California has been far higher than anywhere else, especially in 2018 and 2019. The value of strawberries fluctuated more in California, and was more stable in Florida.
+    To sum up, we can conclude from the above results that the different additives used in each place had no significant effect on the value of the strawberry.
+
+
+## Citation
+EDA.rmd, Haviland Wright
+ag_data.Rmd, Haviland Wright
