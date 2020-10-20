@@ -1,0 +1,71 @@
+---
+title: "615 Berries"
+author: "Simu Huang"
+date: "2020/10/20"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(ggplot2)
+library(magrittr)
+library(knitr)
+library(tidyverse)
+library(kableExtra)
+
+opts_chunk$set(echo = FALSE, 
+               warning = FALSE,
+               message = FALSE
+               )
+
+```
+
+
+## Summary 
+
+
+In this project, we clean, organize and explore the data. Based on the analysis, we can estimate that  the different additives used in each place had no significant effect on the value of the strawberry.
+
+
+## Cleaned Data
+```{r}
+
+straw<- read.csv("straw_cleaned.csv")
+head(straw)
+
+```
+
+
+## Summary
+```{r}
+summary(straw)
+```
+
+## Summarize the value by group
+```{r}
+s2 <- straw %>% group_by(State) %>% summarize(total=sum(Value)) 
+s3 <- straw %>% group_by(Year, State) %>% summarize(total=sum(Value)) 
+## summary the value by state
+print(s2)
+## summary the value by state and year
+print(s3)
+```
+
+## The total value of strawberries each state in recent years
+```{r}
+barplot(s2$total, names.arg = s2$State)
+
+```
+
+## The line plot of the total value of strawberries per year in each state
+```{r}
+
+bp1 <- ggplot(data= s3,aes(x=Year,y=total,group=State,color=State))+ 
+  geom_line()+ 
+  geom_point()+ 
+  labs(y="Total value")
+print(bp1)
+```
+
+
+
